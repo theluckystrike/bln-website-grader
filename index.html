@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Free Website Grader | BeLikeNative</title>
+<meta name="description" content="Get a free, instant website performance report. Analyze speed, SEO, accessibility, and best practices with Google Lighthouse data.">
+<style>
+  /* ===== RESET & BASE ===== */
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    background:#0a0e17;
+    color:#c9d1d9;
+    font-family:'SF Mono','Fira Code','Cascadia Code',Consolas,'Courier New',monospace;
+    font-size:14px;
+    line-height:1.6;
+    min-height:100vh;
+  }
+
+  /* ===== LAYOUT ===== */
+  .page-wrap{max-width:900px;margin:0 auto;padding:24px 20px 60px;}
+
+  /* ===== HEADER ===== */
+  .site-header{text-align:center;padding:48px 0 40px;}
+  .site-header h1{
+    font-size:clamp(24px,5vw,42px);
+    color:#f0f6fc;
+    letter-spacing:-0.5px;
+    margin-bottom:8px;
+  }
+  .site-header h1 span{color:#58a6ff;}
+  .site-header p{color:#8b949e;font-size:15px;max-width:520px;margin:0 auto;}
+
+  /* ===== INPUT FORM ===== */
+  .grader-form{
+    display:flex;gap:8px;max-width:640px;margin:32px auto 0;
+    background:#161b22;border:1px solid #30363d;border-radius:12px;
+    padding:6px;transition:border-color 0.2s;
+  }
+  .grader-form:focus-within{border-color:#58a6ff;}
+  .grader-form input[type="url"]{
+    flex:1;background:transparent;border:none;outline:none;
+    color:#f0f6fc;font-family:inherit;font-size:16px;padding:12px 16px;
+    min-width:0;
+  }
+  .grader-form input::placeholder{color:#484f58;}
+  .grader-form button{
+    background:#58a6ff;color:#0a0e17;border:none;border-radius:8px;
+    padding:12px 28px;font-family:inherit;font-size:15px;font-weight:700;
+    cursor:pointer;transition:background 0.2s,transform 0.1s;white-space:nowrap;
+  }
+  .grader-form button:hover{background:#79c0ff;}
+  .grader-form button:active{transform:scale(0.97);}
+  .grader-form button:disabled{opacity:0.5;cursor:not-allowed;}
+
+  /* ===== STRATEGY TOGGLE ===== */
+  .strategy-row{
+    display:flex;gap:12px;justify-content:center;margin-top:16px;
+  }
+  .strategy-btn{
+    background:#161b22;border:1px solid #30363d;color:#8b949e;
+    padding:6px 20px;border-radius:20px;font-family:inherit;font-size:13px;
+    cursor:pointer;transition:all 0.2s;
+  }
+  .strategy-btn.active{border-color:#58a6ff;color:#58a6ff;background:#0d1117;}
+  .strategy-btn:hover{border-color:#58a6ff;}
+
+  /* ===== LOADING STATE ===== */
+  .loading{display:none;text-align:center;padding:60px 20px;}
+  .loading.visible{display:block;}
+  .spinner{
+    width:48px;height:48px;border:3px solid #21262d;border-top-color:#58a6ff;
+    border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 20px;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .loading p{color:#8b949e;font-size:14px;}
+  .loading .elapsed{color:#484f58;font-size:12px;margin-top:4px;}
+
+  /* ===== ERROR STATE ===== */
+  .error-msg{
+    display:none;max-width:640px;margin:20px auto;padding:16px 20px;
+    background:#1a0d0d;border:1px solid #f85149;border-radius:8px;
+    color:#f85149;text-align:center;font-size:14px;
+  }
+  .error-msg.visible{display:block;}
+
+  /* ===== RESULTS ===== */
+  .results{display:none;}
+  .results.visible{display:block;}
+
+  /* Score Header */
+  .score-hero{
+    text-align:center;padding:48px 0 40px;
+    border-bottom:1px solid #21262d;margin-bottom:40px;
+  }
+  .score-hero .graded-url{
+    color:#58a6ff;font-size:15px;word-break:break-all;margin-bottom:4px;
+  }
+  .score-hero .graded-meta{color:#484f58;font-size:12px;margin-bottom:24px;}
+
+  .score-flex{display:flex;align-items:center;justify-content:center;gap:40px;flex-wrap:wrap;}
+  .gauge-container svg{display:block;}
+  .grade-block{text-align:center;}
+  .grade-block .letter{font-size:80px;font-weight:700;line-height:1;}
+  .grade-block .label{font-size:18px;color:#8b949e;margin-top:4px;}
+
+  /* Categories */
+  .section{margin-bottom:40px;}
+  .section h2{
+    font-size:18px;color:#f0f6fc;margin-bottom:16px;
+    padding-bottom:8px;border-bottom:1px solid #21262d;
+  }
+  .cat-row{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
+  .cat-name{width:150px;color:#8b949e;font-size:13px;text-align:right;flex-shrink:0;}
+  .cat-bar-bg{flex:1;height:28px;background:#161b22;border-radius:6px;overflow:hidden;position:relative;}
+  .cat-bar-fill{height:100%;border-radius:6px;transition:width 0.8s ease;position:relative;}
+  .cat-bar-fill::after{
+    content:attr(data-score);position:absolute;right:8px;top:50%;transform:translateY(-50%);
+    font-size:12px;font-weight:700;color:rgba(0,0,0,0.8);
+  }
+  .cat-score{width:42px;font-weight:700;font-size:18px;text-align:right;}
+
+  /* Web Vitals */
+  .vitals-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;}
+  .vital-card{
+    background:#161b22;border:1px solid #21262d;border-radius:8px;
+    padding:20px;text-align:center;transition:border-color 0.2s;
+  }
+  .vital-card:hover{border-color:#30363d;}
+  .vital-label{
+    font-size:11px;color:#8b949e;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;
+  }
+  .vital-value{font-size:28px;font-weight:700;margin-bottom:4px;}
+  .vital-rating{font-size:11px;text-transform:uppercase;letter-spacing:1px;}
+
+  /* Issues */
+  .issue-row{
+    display:flex;align-items:flex-start;gap:12px;padding:14px;margin-bottom:8px;
+    background:#161b22;border:1px solid #21262d;border-radius:8px;
+    transition:border-color 0.2s;
+  }
+  .issue-row:hover{border-color:#30363d;}
+  .issue-sev{
+    flex-shrink:0;padding:3px 10px;border-radius:4px;
+    font-size:11px;font-weight:700;color:#fff;text-transform:uppercase;
+  }
+  .issue-info{flex:1;min-width:0;}
+  .issue-title{color:#f0f6fc;font-weight:600;margin-bottom:4px;font-size:14px;}
+  .issue-metric{color:#ffa400;font-size:13px;margin-bottom:2px;}
+  .issue-desc{color:#8b949e;font-size:12px;line-height:1.4;}
+  .issue-score-badge{
+    flex-shrink:0;width:44px;text-align:right;font-size:20px;font-weight:700;
+  }
+
+  /* CTA */
+  .cta-section{
+    background:linear-gradient(135deg,#111827 0%,#0a0e17 100%);
+    border:2px solid #58a6ff;border-radius:16px;padding:48px 32px;
+    text-align:center;margin:48px 0;
+  }
+  .cta-section .cta-headline{font-size:26px;color:#f0f6fc;margin-bottom:8px;}
+  .cta-section .cta-sub{color:#ffa400;font-size:16px;margin-bottom:20px;}
+  .cta-section .cta-body{color:#c9d1d9;font-size:15px;line-height:1.8;margin-bottom:28px;}
+  .cta-section .cta-btn{
+    display:inline-block;background:#58a6ff;color:#0a0e17;padding:16px 40px;
+    border-radius:8px;text-decoration:none;font-weight:700;font-size:17px;
+    transition:background 0.2s,transform 0.1s;
+  }
+  .cta-section .cta-btn:hover{background:#79c0ff;transform:translateY(-1px);}
+
+  /* Footer */
+  .site-footer{
+    text-align:center;color:#484f58;font-size:12px;padding:32px 0;
+    border-top:1px solid #161b22;
+  }
+  .site-footer a{color:#58a6ff;text-decoration:none;}
+
+  /* Responsive */
+  @media(max-width:640px){
+    .grader-form{flex-direction:column;}
+    .grader-form button{width:100%;}
+    .cat-name{width:90px;font-size:11px;}
+    .score-flex{flex-direction:column;gap:20px;}
+    .grade-block .letter{font-size:56px;}
+    .cta-section{padding:32px 20px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="page-wrap">
+
+  <!-- HEADER -->
+  <header class="site-header">
+    <h1>Free Website <span>Grader</span></h1>
+    <p>Enter any URL to get an instant performance, SEO, accessibility, and best practices report powered by Google Lighthouse.</p>
+  </header>
+
+  <!-- INPUT FORM -->
+  <form class="grader-form" id="graderForm">
+    <input type="url" id="urlInput" placeholder="https://example.com" required autocomplete="url" autofocus>
+    <button type="submit" id="gradeBtn">Grade Site</button>
+  </form>
+
+  <div class="strategy-row">
+    <button type="button" class="strategy-btn active" data-strategy="mobile">Mobile</button>
+    <button type="button" class="strategy-btn" data-strategy="desktop">Desktop</button>
+  </div>
+
+  <!-- ERROR -->
+  <div class="error-msg" id="errorMsg"></div>
+
+  <!-- LOADING -->
+  <div class="loading" id="loadingState">
+    <div class="spinner"></div>
+    <p>Analyzing website with Google Lighthouse...</p>
+    <p class="elapsed" id="elapsedTime">0s elapsed</p>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="results" id="resultsSection">
+
+    <div class="score-hero">
+      <div class="graded-url" id="resultUrl"></div>
+      <div class="graded-meta" id="resultMeta"></div>
+      <div class="score-flex">
+        <div class="gauge-container" id="gaugeContainer"></div>
+        <div class="grade-block">
+          <div class="letter" id="gradeLetter"></div>
+          <div class="label" id="gradeLabel"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section" id="categoriesSection">
+      <h2>Category Breakdown</h2>
+      <div id="categoryBars"></div>
+    </div>
+
+    <div class="section" id="vitalsSection">
+      <h2>Core Web Vitals</h2>
+      <div class="vitals-grid" id="vitalsGrid"></div>
+    </div>
+
+    <div class="section" id="issuesSection">
+      <h2>Top Issues</h2>
+      <div id="issuesList"></div>
+    </div>
+
+    <div class="cta-section" id="ctaSection"></div>
+
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="site-footer">
+    <p>Powered by Google PageSpeed Insights &middot; Built by <a href="https://belikenative.com" target="_blank" rel="noopener">BeLikeNative</a></p>
+  </footer>
+
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  /* ===== CONSTANTS ===== */
+  var PSI_API = 'https://www.googleapis.com/pagespeedonline/v5/runPagespeed';
+  var CATEGORIES = ['PERFORMANCE','ACCESSIBILITY','BEST_PRACTICES','SEO'];
+  var WEIGHTS = {'performance':0.40,'accessibility':0.20,'best-practices':0.15,'seo':0.25};
+  var GRADES = [
+    {min:90,grade:'A',label:'Excellent'},
+    {min:80,grade:'B',label:'Good'},
+    {min:60,grade:'C',label:'Needs Improvement'},
+    {min:40,grade:'D',label:'Poor'},
+    {min:0,grade:'F',label:'Critical'}
+  ];
+  var CAT_NAMES = {
+    'performance':'Performance','accessibility':'Accessibility',
+    'best-practices':'Best Practices','seo':'SEO'
+  };
+  var MAX_ISSUES = 10;
+
+  /* ===== DOM REFS ===== */
+  var form = document.getElementById('graderForm');
+  var urlInput = document.getElementById('urlInput');
+  var gradeBtn = document.getElementById('gradeBtn');
+  var errorMsg = document.getElementById('errorMsg');
+  var loadingState = document.getElementById('loadingState');
+  var elapsedEl = document.getElementById('elapsedTime');
+  var resultsSection = document.getElementById('resultsSection');
+
+  var selectedStrategy = 'mobile';
+  var elapsedTimer = null;
+
+  /* ===== STRATEGY TOGGLE ===== */
+  var stratBtns = document.querySelectorAll('.strategy-btn');
+  for (var i = 0; i < stratBtns.length; i++) {
+    stratBtns[i].addEventListener('click', function() {
+      for (var j = 0; j < stratBtns.length; j++) {
+        stratBtns[j].classList.remove('active');
+      }
+      this.classList.add('active');
+      selectedStrategy = this.getAttribute('data-strategy');
+    });
+  }
+
+  /* ===== HELPERS ===== */
+  function scoreColor(s) {
+    if (s >= 90) return '#0cce6b';
+    if (s >= 50) return '#ffa400';
+    return '#ff4e42';
+  }
+
+  function ratingColor(r) {
+    if (r === 'GOOD') return '#0cce6b';
+    if (r === 'NEEDS_IMPROVEMENT') return '#ffa400';
+    if (r === 'POOR') return '#ff4e42';
+    return '#888';
+  }
+
+  function escHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function getGrade(score) {
+    for (var i = 0; i < GRADES.length; i++) {
+      if (score >= GRADES[i].min) return GRADES[i];
+    }
+    return GRADES[GRADES.length - 1];
+  }
+
+  function normalizeUrl(raw) {
+    var t = raw.trim();
+    if (t.indexOf('http://') === 0 || t.indexOf('https://') === 0) return t;
+    return 'https://' + t;
+  }
+
+  function formatMetric(m) {
+    if (m.displayValue) return m.displayValue;
+    if (m.value === null || m.value === undefined) return 'N/A';
+    if (m.unit === 'unitless') return m.value.toFixed(3);
+    if (m.value >= 1000) return (m.value / 1000).toFixed(1) + ' s';
+    return Math.round(m.value) + ' ms';
+  }
+
+  /* ===== SHOW/HIDE ===== */
+  function showError(msg) {
+    errorMsg.textContent = msg;
+    errorMsg.classList.add('visible');
+  }
+
+  function hideError() {
+    errorMsg.classList.remove('visible');
+  }
+
+  function showLoading() {
+    loadingState.classList.add('visible');
+    resultsSection.classList.remove('visible');
+    hideError();
+    var start = Date.now();
+    if (elapsedTimer) clearInterval(elapsedTimer);
+    elapsedTimer = setInterval(function() {
+      var sec = Math.round((Date.now() - start) / 1000);
+      elapsedEl.textContent = sec + 's elapsed';
+    }, 1000);
+  }
+
+  function hideLoading() {
+    loadingState.classList.remove('visible');
+    if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null; }
+  }
+
+  /* ===== API CALL ===== */
+  function fetchPsi(url, strategy) {
+    var params = new URLSearchParams();
+    params.set('url', url);
+    params.set('strategy', strategy);
+    for (var i = 0; i < CATEGORIES.length; i++) {
+      params.append('category', CATEGORIES[i]);
+    }
+    var apiUrl = PSI_API + '?' + params.toString();
+
+    return fetch(apiUrl, {signal: AbortSignal.timeout ? AbortSignal.timeout(120000) : undefined})
+      .then(function(resp) {
+        if (!resp.ok) {
+          return resp.text().then(function(body) {
+            throw new Error('API error ' + resp.status + ': ' + body.slice(0, 300));
+          });
+        }
+        return resp.json();
+      });
+  }
+
+  /* ===== PARSE RESULTS ===== */
+  function parseResults(data, targetUrl, strategy) {
+    var cats = data.lighthouseResult.categories;
+    var audits = data.lighthouseResult.audits || {};
+    var loadingExp = (data.loadingExperience || {}).metrics || {};
+
+    /* Category scores */
+    var categoryScores = {};
+    var keys = Object.keys(cats);
+    for (var i = 0; i < keys.length; i++) {
+      categoryScores[keys[i]] = Math.round((cats[keys[i]].score || 0) * 100);
+    }
+
+    /* Overall score */
+    var weighted = 0, totalW = 0;
+    var wKeys = Object.keys(WEIGHTS);
+    for (var w = 0; w < wKeys.length; w++) {
+      var sc = categoryScores[wKeys[w]];
+      if (typeof sc === 'number') {
+        weighted += sc * WEIGHTS[wKeys[w]];
+        totalW += WEIGHTS[wKeys[w]];
+      }
+    }
+    var overallScore = totalW > 0 ? Math.round(weighted / totalW) : 0;
+
+    /* Web Vitals */
+    function getVital(auditKey, loadKey) {
+      var a = audits[auditKey] || {};
+      var l = loadingExp[loadKey] || {};
+      var val = a.numericValue != null ? a.numericValue : (l.percentile != null ? l.percentile : null);
+      var unit = a.numericUnit || 'millisecond';
+      var rating = l.category || (a.score == null ? 'N/A' : (a.score >= 0.9 ? 'GOOD' : (a.score >= 0.5 ? 'NEEDS_IMPROVEMENT' : 'POOR')));
+      return {value: val, unit: unit, displayValue: a.displayValue || null, rating: rating};
+    }
+
+    var vitals = {
+      lcp: getVital('largest-contentful-paint','LARGEST_CONTENTFUL_PAINT_MS'),
+      fcp: getVital('first-contentful-paint','FIRST_CONTENTFUL_PAINT_MS'),
+      tbt: getVital('total-blocking-time', null),
+      cls: getVital('cumulative-layout-shift','CUMULATIVE_LAYOUT_SHIFT_SCORE'),
+      si: getVital('speed-index', null),
+      ttfb: getVital('server-response-time','EXPERIMENTAL_TIME_TO_FIRST_BYTE')
+    };
+
+    /* Top Issues */
+    var issues = [];
+    var auditKeys = Object.keys(audits);
+    for (var a = 0; a < auditKeys.length && issues.length < MAX_ISSUES * 3; a++) {
+      var audit = audits[auditKeys[a]];
+      if (!audit || audit.score === null || audit.score === undefined) continue;
+      if (audit.score >= 0.9) continue;
+      if (audit.scoreDisplayMode === 'manual' || audit.scoreDisplayMode === 'informative') continue;
+      if (audit.scoreDisplayMode === 'notApplicable') continue;
+      issues.push({
+        title: audit.title || auditKeys[a],
+        description: (audit.description || '').split('[Learn more]')[0].trim(),
+        score: audit.score,
+        displayValue: audit.displayValue || null,
+        severity: audit.score < 0.5 ? 'high' : 'medium'
+      });
+    }
+    issues.sort(function(x, y) { return x.score - y.score; });
+    issues = issues.slice(0, MAX_ISSUES);
+
+    return {
+      url: targetUrl,
+      strategy: strategy,
+      timestamp: new Date().toISOString(),
+      overallScore: overallScore,
+      grade: getGrade(overallScore),
+      categoryScores: categoryScores,
+      vitals: vitals,
+      issues: issues,
+      lighthouseVersion: data.lighthouseResult.lighthouseVersion || 'unknown'
+    };
+  }
+
+  /* ===== RENDER GAUGE ===== */
+  function renderGauge(score) {
+    var color = scoreColor(score);
+    var circ = 2 * Math.PI * 54;
+    var offset = circ * (1 - score / 100);
+    return '<svg viewBox="0 0 120 120" width="180" height="180">' +
+      '<circle cx="60" cy="60" r="54" fill="none" stroke="#1c2333" stroke-width="8"/>' +
+      '<circle cx="60" cy="60" r="54" fill="none" stroke="' + color + '" stroke-width="8" ' +
+        'stroke-dasharray="' + circ + '" stroke-dashoffset="' + offset + '" ' +
+        'stroke-linecap="round" transform="rotate(-90 60 60)" ' +
+        'style="transition:stroke-dashoffset 1.2s ease;"/>' +
+      '<text x="60" y="55" text-anchor="middle" fill="' + color + '" ' +
+        'font-size="38" font-weight="bold" font-family="monospace">' + score + '</text>' +
+      '<text x="60" y="75" text-anchor="middle" fill="#6e7681" ' +
+        'font-size="12" font-family="monospace">/ 100</text>' +
+      '</svg>';
+  }
+
+  /* ===== RENDER ALL RESULTS ===== */
+  function renderResults(r) {
+    /* URL & meta */
+    document.getElementById('resultUrl').textContent = r.url;
+    document.getElementById('resultMeta').textContent =
+      r.strategy.toUpperCase() + '  |  ' + new Date(r.timestamp).toLocaleString() +
+      '  |  Lighthouse ' + r.lighthouseVersion;
+
+    /* Gauge */
+    document.getElementById('gaugeContainer').innerHTML = renderGauge(r.overallScore);
+
+    /* Grade */
+    var gradeLetter = document.getElementById('gradeLetter');
+    gradeLetter.textContent = r.grade.grade;
+    gradeLetter.style.color = scoreColor(r.overallScore);
+    document.getElementById('gradeLabel').textContent = r.grade.label;
+
+    /* Category Bars */
+    var barsHtml = '';
+    var catKeys = Object.keys(r.categoryScores);
+    for (var i = 0; i < catKeys.length; i++) {
+      var k = catKeys[i];
+      var s = r.categoryScores[k];
+      var c = scoreColor(s);
+      barsHtml += '<div class="cat-row">' +
+        '<span class="cat-name">' + escHtml(CAT_NAMES[k] || k) + '</span>' +
+        '<div class="cat-bar-bg"><div class="cat-bar-fill" data-score="' + s + '" ' +
+          'style="width:0%;background:' + c + ';"></div></div>' +
+        '<span class="cat-score" style="color:' + c + ';">' + s + '</span></div>';
+    }
+    document.getElementById('categoryBars').innerHTML = barsHtml;
+
+    /* Animate bars after a tick */
+    setTimeout(function() {
+      var fills = document.querySelectorAll('.cat-bar-fill');
+      for (var f = 0; f < fills.length; f++) {
+        fills[f].style.width = fills[f].getAttribute('data-score') + '%';
+      }
+    }, 50);
+
+    /* Web Vitals */
+    var vHtml = '';
+    var vList = [
+      {key:'lcp',label:'Largest Contentful Paint (LCP)'},
+      {key:'fcp',label:'First Contentful Paint (FCP)'},
+      {key:'tbt',label:'Total Blocking Time (TBT)'},
+      {key:'cls',label:'Cumulative Layout Shift (CLS)'},
+      {key:'si',label:'Speed Index (SI)'},
+      {key:'ttfb',label:'Time to First Byte (TTFB)'}
+    ];
+    for (var v = 0; v < vList.length; v++) {
+      var vd = r.vitals[vList[v].key];
+      if (!vd) continue;
+      var vc = ratingColor(vd.rating);
+      vHtml += '<div class="vital-card">' +
+        '<div class="vital-label">' + vList[v].label + '</div>' +
+        '<div class="vital-value" style="color:' + vc + ';">' + formatMetric(vd) + '</div>' +
+        '<div class="vital-rating" style="color:' + vc + ';">' + (vd.rating || 'N/A') + '</div></div>';
+    }
+    document.getElementById('vitalsGrid').innerHTML = vHtml;
+
+    /* Issues */
+    var iHtml = '';
+    if (r.issues.length === 0) {
+      iHtml = '<p style="color:#0cce6b;text-align:center;padding:20px;">No significant issues found.</p>';
+    } else {
+      for (var ix = 0; ix < r.issues.length; ix++) {
+        var iss = r.issues[ix];
+        var sevC = iss.severity === 'high' ? '#ff4e42' : '#ffa400';
+        var sevL = iss.severity === 'high' ? 'HIGH' : 'MED';
+        var sp = Math.round((iss.score || 0) * 100);
+        iHtml += '<div class="issue-row">' +
+          '<span class="issue-sev" style="background:' + sevC + ';">' + sevL + '</span>' +
+          '<div class="issue-info">' +
+            '<div class="issue-title">' + escHtml(iss.title) + '</div>' +
+            (iss.displayValue ? '<div class="issue-metric">' + escHtml(iss.displayValue) + '</div>' : '') +
+            '<div class="issue-desc">' + escHtml(iss.description).substring(0, 200) + '</div>' +
+          '</div>' +
+          '<span class="issue-score-badge" style="color:' + scoreColor(sp) + ';">' + sp + '</span></div>';
+      }
+    }
+    document.getElementById('issuesList').innerHTML = iHtml;
+
+    /* CTA */
+    var urgency = r.overallScore < 50
+      ? 'Your website needs immediate professional attention.'
+      : r.overallScore < 80
+      ? 'There is significant room for improvement.'
+      : 'Maintain your competitive edge with ongoing optimization.';
+
+    var subj = encodeURIComponent('Website Optimization - ' + r.url + ' (Score: ' + r.overallScore + '/100)');
+    var body = encodeURIComponent('Hi,\n\nI ran a website audit on ' + r.url +
+      ' and it scored ' + r.overallScore + '/100.\n\nI\'d like to discuss optimization services.\n\nBest regards');
+
+    document.getElementById('ctaSection').innerHTML =
+      '<div class="cta-headline">Your website scores <strong>' + r.overallScore + '/100</strong></div>' +
+      '<div class="cta-sub">' + urgency + '</div>' +
+      '<p class="cta-body">A professional audit and optimization can improve this to <strong>90+</strong>.<br>' +
+        'Full-stack development services starting at <strong>$5,000</strong>.</p>' +
+      '<a href="mailto:support@belikenative.com?subject=' + subj + '&body=' + body +
+        '" class="cta-btn">Book a Free Consultation</a>';
+
+    /* Show results */
+    resultsSection.classList.add('visible');
+    document.getElementById('resultsSection').scrollIntoView({behavior:'smooth',block:'start'});
+  }
+
+  /* ===== FORM SUBMIT ===== */
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    var rawUrl = urlInput.value.trim();
+    if (!rawUrl) {
+      showError('Please enter a URL.');
+      return;
+    }
+
+    var targetUrl = normalizeUrl(rawUrl);
+
+    hideError();
+    gradeBtn.disabled = true;
+    gradeBtn.textContent = 'Grading...';
+    showLoading();
+    resultsSection.classList.remove('visible');
+
+    fetchPsi(targetUrl, selectedStrategy)
+      .then(function(data) {
+        if (!data || !data.lighthouseResult || !data.lighthouseResult.categories) {
+          throw new Error('Invalid response from PageSpeed Insights API. The URL may be unreachable.');
+        }
+        var results = parseResults(data, targetUrl, selectedStrategy);
+        hideLoading();
+        renderResults(results);
+      })
+      .catch(function(err) {
+        hideLoading();
+        var msg = err.message || 'Unknown error occurred.';
+        if (msg.indexOf('Failed to fetch') !== -1 || msg.indexOf('NetworkError') !== -1) {
+          msg = 'Network error. Check your connection and try again.';
+        }
+        if (msg.indexOf('AbortError') !== -1 || msg.indexOf('timeout') !== -1) {
+          msg = 'Request timed out. The PageSpeed API took too long. Try again.';
+        }
+        showError(msg);
+      })
+      .finally(function() {
+        gradeBtn.disabled = false;
+        gradeBtn.textContent = 'Grade Site';
+      });
+  });
+
+})();
+</script>
+
+</body>
+</html>
